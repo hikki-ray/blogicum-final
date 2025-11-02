@@ -18,8 +18,12 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('blog.urls', namespace='blog')),
-    path('posts/', include('blog.urls', namespace='blog')),
-    path('category/', include('blog.urls', namespace='blog')),
-    path('pages/', include('pages.urls', namespace='pages'))
+    path('', include('blog.urls')),
+    path('posts/', include('blog.urls')),
+    path('category/', include('blog.urls')),
+    path('pages/', include('pages.urls')),
+    # path('auth/', include('django.contrib.auth.urls'))
 ]
+
+handler404 = 'pages.views.page_not_found'
+handler500 = 'pages.views.internal_server_error'
