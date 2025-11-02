@@ -1,25 +1,56 @@
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.http import Http404
+from django.views.generic import ListView, DetailView
+from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
+
 from .models import Post, Category
 
-# Create your views here.
+
+User = get_user_model()
+
+class IndexListView(ListView):
+    model = Post
+    template_name = 'blog/index.html'
+    paginate_by = 10
 
 
-def index(request):
-    template = 'blog/index.html'
-    post_list = Post.objects.select_related(
-        'location', 'category', 'author'
-    ).filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=timezone.now()
-    ).reverse()[:5]
+class PostCategoryListView(ListView):
+    model = Post
+    template_name = 'blog/category.html'
+    paginate_by = 10
 
-    context = {
-        'post_list': post_list
-    }
-    return render(request, template, context)
+    def get_queryset(self):
+        category_slug = self.kwargs['category_slug']
+        return Post.objects.filter(
+            category__slug=category_slug,
+            is_published=True,
+            pub_date__lte=timezone.now()
+        ).select_related('category', 'author')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        category_slug = self.kwargs['category_slug']
+        context['category'] = get_object_or_404(Category, slug=category_slug)
+        return context
+    
+
+class ProfileDetailView(DetailView):
+    model = User
+    slug_field = 'username'
+    slug_url_kwarg = 'username'
+    template_name = 'blog/profile.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        posts = Post.objects.filter(author__username=self.object.username)
+        paginator = Paginator(posts, 10)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        context['profile'] = self.object
+        context['page_obj'] = page_obj
+        return context
 
 
 def post_detail(request, post_id):
@@ -36,31 +67,5 @@ def post_detail(request, post_id):
     )
     context = {
         'post': post
-    }
-    return render(request, template, context)
-
-
-def category_posts(request, category_slug):
-    template = 'blog/category.html'
-    try:
-        category = Category.objects.get(slug=category_slug)
-    except Exception:
-        category = category_slug
-        post_list = []
-    else:
-        if category.is_published:
-            post_list = Post.objects.select_related(
-                'location', 'category', 'author'
-            ).filter(
-                is_published=True,
-                category__title=category.title,
-                pub_date__lte=timezone.now()
-            ).reverse()
-        else:
-            raise Http404(f'Категория {category.title} не для публикации')
-
-    context = {
-        'category': category,
-        'post_list': post_list
     }
     return render(request, template, context)
