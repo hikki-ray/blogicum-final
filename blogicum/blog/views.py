@@ -49,6 +49,7 @@ class ProfileDetailView(DetailView):
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
         context['profile'] = self.object
+        context['user'] = self.request.user
         context['page_obj'] = page_obj
         return context
 
