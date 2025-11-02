@@ -1,10 +1,10 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
-from django.views.generic import ListView, DetailView, CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 
 from .models import Post, Category
 from .forms import PostForm
@@ -12,7 +12,7 @@ from .forms import PostForm
 
 User = get_user_model()
 
-class IndexListView(ListView):
+class PostListView(ListView):
     model = Post
     queryset = Post.objects.filter(
         is_published=True,
@@ -20,6 +20,48 @@ class IndexListView(ListView):
     ).select_related('category', 'author')
     template_name = 'blog/index.html'
     paginate_by = 10
+
+
+class PostDetailView(DetailView):
+    model = Post
+    pk_url_kwarg = 'post_id'
+    template_name = 'blog/detail.html'
+
+
+class PostUpdateView(UpdateView):
+    model = Post
+    pk_url_kwarg = 'post_id'
+    form_class = PostForm
+    template_name = 'blog/create.html'
+    
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            return redirect('blog:post_detail', post_id=obj.id)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.id})
+
+
+class PostDeleteView(DeleteView):
+    model = Post
+    pk_url_kwarg = 'post_id'
+    template_name = 'blog/create.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.author != request.user:
+            return redirect('blog:post_detail', post_id=obj.id)
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = PostForm(instance=self.object)
+        return context
+
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})
 
 
 class PostCategoryListView(ListView):
@@ -74,21 +116,3 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('blog:profile', kwargs={'username': self.request.user.username})
-
-
-def post_detail(request, post_id):
-    template = 'blog/detail.html'
-    post = get_object_or_404(
-        Post.objects.select_related(
-            'location', 'category', 'author'
-        ).filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lte=timezone.now()
-        ),
-        pk=post_id
-    )
-    context = {
-        'post': post
-    }
-    return render(request, template, context)
