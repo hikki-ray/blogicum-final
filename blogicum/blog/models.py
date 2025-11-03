@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+
 class BaseModel(models.Model):
     is_published = models.BooleanField(
         'Опубликовано',
@@ -74,7 +75,8 @@ class Post(BaseModel):
         verbose_name='Категория',
         null=True
     )
-    image = models.ImageField('Изображение', blank=True, upload_to='post_images')
+    image = models.ImageField(
+        'Изображение', blank=True, upload_to='post_images')
 
     class Meta:
         verbose_name = 'публикация'
