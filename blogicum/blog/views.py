@@ -17,7 +17,7 @@ class PostListView(ListView):
     model = Post
     queryset = Post.objects.filter(
         is_published=True,
-        # pub_date__lte=timezone.now()
+        pub_date__lte=timezone.now()
     ).select_related(
         'category', 'author'
     ).annotate(
