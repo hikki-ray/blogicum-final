@@ -17,17 +17,32 @@ from .forms import PostForm, CommentForm, CustomUserChangeForm
 User = get_user_model()
 
 
-class PostListView(ListView):
-    model = Post
-    queryset = Post.objects.filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=timezone.now()
-    ).select_related(
-        'category', 'author'
-    ).annotate(
+def annotate_ordering_posts(queryset):
+    return queryset.annotate(
         comment_count=Count('comments')
     ).order_by('-pub_date')
+
+
+def paginate_posts(self):
+    posts = annotate_ordering_posts(
+        Post.objects.filter(
+            author__username=self.object.username
+        ).select_related('category', 'author'))
+
+    paginator = Paginator(posts, 10)
+    page_number = self.request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return page_obj
+
+
+class PostListView(ListView):
+    model = Post
+    queryset = annotate_ordering_posts(
+        Post.objects.filter(
+            is_published=True,
+            category__is_published=True,
+            pub_date__lte=timezone.now()
+        ).select_related('category', 'author'))
     template_name = 'blog/index.html'
     paginate_by = 10
 
@@ -59,7 +74,6 @@ class PostCreateView(LoginRequiredMixin, CreateView):
     template_name = 'blog/create.html'
 
     def form_valid(self, form):
-        form.instance.is_published = True
         form.instance.author = self.request.user
         return super().form_valid(form)
 
@@ -70,7 +84,7 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class PostUpdateView(UpdateView):
+class PostUpdateView(LoginRequiredMixin, UpdateView):
     model = Post
     pk_url_kwarg = 'post_id'
     form_class = PostForm
@@ -89,7 +103,7 @@ class PostUpdateView(UpdateView):
         )
 
 
-class PostDeleteView(DeleteView):
+class PostDeleteView(LoginRequiredMixin, DeleteView):
     model = Post
     pk_url_kwarg = 'post_id'
     template_name = 'blog/create.html'
@@ -119,16 +133,13 @@ class PostCategoryListView(ListView):
 
     def get_queryset(self):
         category_slug = self.kwargs['category_slug']
-        return Post.objects.filter(
-            category__slug=category_slug,
-            category__is_published=True,
-            is_published=True,
-            pub_date__lte=timezone.now()
-        ).select_related(
-            'category', 'author'
-        ).annotate(
-            comment_count=Count('comments')
-        ).order_by('-pub_date')
+        return annotate_ordering_posts(
+            Post.objects.filter(
+                category__slug=category_slug,
+                category__is_published=True,
+                is_published=True,
+                pub_date__lte=timezone.now()
+            ).select_related('category', 'author'))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -149,20 +160,9 @@ class ProfileDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        posts = Post.objects.filter(
-            author__username=self.object.username
-        ).select_related(
-            'category', 'author'
-        ).annotate(
-            comment_count=Count('comments')
-        ).order_by('-pub_date')
-
-        paginator = Paginator(posts, 10)
-        page_number = self.request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
         context['profile'] = self.object
         context['user'] = self.request.user
-        context['page_obj'] = page_obj
+        context['page_obj'] = paginate_posts(self)
         return context
 
 
@@ -206,7 +206,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
         )
 
 
-class CommentUpdateView(UpdateView):
+class CommentUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
     pk_url_kwarg = 'comment_id'
     form_class = CommentForm
@@ -236,7 +236,7 @@ class CommentUpdateView(UpdateView):
         )
 
 
-class CommentDeleteView(DeleteView):
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
     pk_url_kwarg = 'comment_id'
     template_name = 'blog/comment.html'
