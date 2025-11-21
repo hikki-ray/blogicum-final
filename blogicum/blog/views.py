@@ -41,7 +41,7 @@ class PostListView(ListView):
         Post.objects.filter(
             is_published=True,
             category__is_published=True,
-            pub_date__lte=timezone.now()
+            pub_date__lte=timezone.localtime()
         ).select_related('category', 'author'))
     template_name = 'blog/index.html'
     paginate_by = 10
@@ -57,7 +57,7 @@ class PostDetailView(DetailView):
         if (not post.is_published or not post.category.is_published) and (
                 post.author != self.request.user):
             raise Http404("Пост не найден")
-        if post.pub_date > timezone.now() and post.author != self.request.user:
+        if post.pub_date > timezone.localtime() and post.author != self.request.user:
             raise Http404("Пост не найден")
         return post
 
@@ -138,7 +138,7 @@ class PostCategoryListView(ListView):
                 category__slug=category_slug,
                 category__is_published=True,
                 is_published=True,
-                pub_date__lte=timezone.now()
+                pub_date__lte=timezone.localtime()
             ).select_related('category', 'author'))
 
     def get_context_data(self, **kwargs):
