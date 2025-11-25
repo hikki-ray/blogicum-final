@@ -37,14 +37,16 @@ def paginate_posts(self):
 
 class PostListView(ListView):
     model = Post
-    queryset = annotate_ordering_posts(
-        Post.objects.filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lte=timezone.localtime()
-        ).select_related('category', 'author'))
     template_name = 'blog/index.html'
     paginate_by = 10
+
+    def get_queryset(self):
+        return annotate_ordering_posts(
+            Post.objects.filter(
+                category__is_published=True,
+                is_published=True,
+                pub_date__lte=timezone.localtime()
+            ).select_related('category', 'author'))
 
 
 class PostDetailView(DetailView):
